@@ -10,11 +10,12 @@ import {
 } from "@solana/wallet-adapter-react-ui";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
+import { ENV } from "./utils/env";
 
 function App() {
   return (
     <>
-      <ConnectionProvider endpoint="https://solana-devnet.g.alchemy.com/v2/1Gc10b6c3_nM4Wk-Im50fmCtKwky6elD">
+      <ConnectionProvider endpoint={ENV.RPC_URL}>
         <WalletProvider wallets={[]} autoConnect>
           <WalletModalProvider>
             <div className="h-screen flex items-center justify-center bg-gradient-to-t from-zinc-800 to-zinc-950/95 text-zinc-100">
