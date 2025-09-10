@@ -6,16 +6,24 @@ import {
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
-import { useState } from "react";
+import { Upload } from "lucide-react";
+import { useState, type InputEvent } from "react";
+import axios from "axios";
 
 function TokenLaunchpad() {
   const { connection } = useConnection();
   const wallet = useWallet();
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
-  const [tokenImageUrl, setTokenImageUrl] = useState("");
+  const [tokenImageFile, setTokenImageFile] = useState<File | null>();
   const [tokenSupply, setTokenSupply] = useState<number>();
   const [tokenDecimals, setTokenDecimals] = useState<number>();
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setTokenImageFile(e.target.files[0]);
+    }
+  };
 
   const handleCreateToken = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,14 +114,23 @@ function TokenLaunchpad() {
           max={9}
         />
 
-        <label htmlFor="imageUrl">Token image url</label>
+        <label>Token image</label>
+        <label
+          htmlFor="imageFile"
+          className="py-5 cursor-pointer rounded-lg flex items-center justify-center bg-zinc-800 hover:bg-zinc-800/80 transition-all duration-150"
+        >
+          <span className="font-bold">
+            {tokenImageFile?.name ? "Selected image : " : <Upload />}
+          </span>
+          <span className="ml-2 px-3 py-1 rounded-md bg-zinc-700">
+            {tokenImageFile?.name || "Upload image"}
+          </span>
+        </label>
         <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="text"
-          id="imageUrl"
-          placeholder="image url"
-          value={tokenImageUrl}
-          onChange={(e) => setTokenImageUrl(e.target.value)}
+          className="hidden"
+          type="file"
+          id="imageFile"
+          onChange={handleImageFileChange}
           required
         />
         <button
