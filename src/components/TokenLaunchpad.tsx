@@ -13,25 +13,47 @@ import {
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { Upload } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { uploadMetadataToIPFS, type MetadataObject } from "../libs/utils";
 import { createInitializeInstruction, pack } from "@solana/spl-token-metadata";
 import { ClipLoader } from "react-spinners";
+import FinalModal from "./FinalModal";
 
 function TokenLaunchpad() {
   const { connection } = useConnection();
   const wallet = useWallet();
+
   const [tokenName, setTokenName] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [tokenImageFile, setTokenImageFile] = useState<File | null>();
   const [tokenDescription, setTokenDescription] = useState("");
   const [tokenSupply, setTokenSupply] = useState<number>();
   const [tokenDecimals, setTokenDecimals] = useState<number>();
+  const [tokenMint, setTokenMint] = useState("");
+  const [tokenImageUri, setTokenImageUri] = useState("");
+  const [preview, setPreview] = useState<string | null>();
   const [status, setStatus] = useState("");
+  const [isFinalModalVisible, setIsFinalModalVisible] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPreview(null);
     if (e.target.files && e.target.files[0]) {
+      if (e.target.files[0].size > 2 * 1024 * 1024) {
+        alert("Image has to be under 2 mb.");
+        e.target.value = "";
+        return;
+      }
       setTokenImageFile(e.target.files[0]);
+      const ObjectUrl = URL.createObjectURL(e.target.files[0]);
+      setPreview(ObjectUrl);
     }
   };
 
@@ -72,20 +94,22 @@ function TokenLaunchpad() {
       metadata: tokenMetadata,
       imageFile: tokenImageFile,
     });
-    if (!uploadRes.cid) {
+    if (!uploadRes.cid || !uploadRes.metadata) {
       setStatus(uploadRes.message);
       return;
     }
+    setTokenImageUri(uploadRes.metadata.image);
     const metadataUri = `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${
       uploadRes.cid
     }`;
-    console.log(metadataUri);
+    // console.log(metadataUri);
 
     //////////////////////////////////////////////////////////////////
 
     setStatus("Generating token...");
 
     const mintKeypair = Keypair.generate();
+    setTokenMint(mintKeypair.publicKey.toString());
     const metadata = {
       mint: mintKeypair.publicKey,
       name: tokenName,
@@ -176,18 +200,32 @@ function TokenLaunchpad() {
     );
     setStatus("Almost done.");
     await wallet.sendTransaction(transaction3, connection);
+    setStatus("Done.");
+    setIsFinalModalVisible(true);
   };
+
   return (
     <div className="relative w-screen lg:w-[60vw] px-7 pb-7 pt-5 lg:px-10 lg:pt-7 lg:pb-10 flex flex-col rounded-xl border border-zinc-700 bg-zinc-950">
       {!wallet.publicKey && (
-        <div className="absolute inset-[1%] h-[98%] w-[98%] backdrop-blur-sm rounded-2xl flex items-center justify-center font-extrabold text-2xl">
+        <div className="absolute z-10 inset-[1%] h-[98%] w-[98%] backdrop-blur-sm rounded-2xl flex items-center justify-center font-extrabold text-2xl">
           <div className="flex px-10 py-5 border rounded-2xl border-red-700 backdrop-blur-xl bg-red-500/15">
             <p>Connect your wallet</p>
             <img src="/arrow-tr.png" className="w-8 h-8 ml-3" />
           </div>
         </div>
       )}
-      {status && (
+      {isFinalModalVisible && (
+        <div className="z-10 absolute inset-[1%] h-[98%] w-[98%] backdrop-blur-sm rounded-2xl flex items-center justify-center">
+          <FinalModal
+            tokenName={tokenName}
+            tokenSymbol={tokenSymbol}
+            tokenMint={tokenMint}
+            tokenImageUri={tokenImageUri}
+          />
+        </div>
+      )}
+
+      {status && !isFinalModalVisible && (
         <div className="flex justify-between text-base md:text-lg px-5 py-3 bg-green-300/15 font-extrabold mb-3 rounded-lg border border-neutral-500 text-green-300">
           <div>{`Status: ${status}`}</div>
           <ClipLoader
@@ -200,7 +238,7 @@ function TokenLaunchpad() {
         </div>
       )}
       <div className="text-2xl font-bold hidden md:block lg:mb-8">
-        Token details
+        <p>Token details</p>
       </div>
       <form
         className="flex flex-col lg:flex-row lg:justify-between gap-3"
@@ -272,19 +310,33 @@ function TokenLaunchpad() {
           <div className="relative">
             <label
               htmlFor="imageFile"
-              className="py-5 lg:py-16 cursor-pointer rounded-lg flex items-center justify-center bg-zinc-800 hover:bg-zinc-800/80 transition-all duration-150"
+              className="py-5 lg:py-10 cursor-pointer rounded-lg flex flex-col items-center justify-center bg-zinc-800 hover:bg-zinc-800/80 transition-all duration-150"
             >
-              <span className="font-bold">
-                {tokenImageFile?.name ? "Selected image : " : <Upload />}
-              </span>
-              <span className="ml-2 px-3 py-1 rounded-md bg-zinc-700">
-                {tokenImageFile?.name || "Upload image"}
-              </span>
+              <div className="flex mb-2">
+                {!tokenImageFile && (
+                  <span className="mr-3 px-3 py-1 rounded-md bg-zinc-700">
+                    Upload image
+                  </span>
+                )}
+                <span className="font-bold">
+                  {tokenImageFile?.name ? "Selected image : " : <Upload />}
+                </span>
+              </div>
+              {preview && (
+                <div className="flex items-center justify-center h-20 w-20 md:w-28 md:h-28 rounded-[100px] overflow-clip">
+                  <img
+                    className="w-20 h-20 md:w-28 md:h-28"
+                    src={preview}
+                    alt="preview"
+                  />
+                </div>
+              )}
             </label>
             <input
               className="absolute inset-1/3 opacity-0"
               type="file"
               id="imageFile"
+              accept="image/png, image/jpg, image/jpeg"
               onChange={handleImageFileChange}
               required
             />

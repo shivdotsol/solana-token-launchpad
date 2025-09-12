@@ -19,6 +19,7 @@ export interface MetadataObject {
 export interface MetadataUploadResponse {
   message: string;
   cid: string | null;
+  metadata: MetadataObject | null;
 }
 
 export interface MetadataUploadParams {
@@ -36,11 +37,15 @@ export const uploadMetadataToIPFS = async ({
 
   const fileType = imageFile.name.split(".").pop()?.toLocaleLowerCase() || "";
   if (!fileType) {
-    return { message: "invalid/missing file type", cid: null };
+    return { message: "invalid/missing file type", cid: null, metadata: null };
   }
   const res = await getSignedUrlForImage(publicKey, fileType);
   if (!res?.data.url)
-    return { message: "failed to get presigned url for image", cid: null };
+    return {
+      message: "failed to get presigned url for image",
+      cid: null,
+      metadata: null,
+    };
 
   // upload image to pinata
 
@@ -55,10 +60,14 @@ export const uploadMetadataToIPFS = async ({
       metadata.properties.files[0].type = imageFile.type;
       // console.log(metadata.image);
     } else {
-      return { message: "failed to upload image file", cid: null };
+      return {
+        message: "failed to upload image file",
+        cid: null,
+        metadata: null,
+      };
     }
   } catch (err: any) {
-    return { message: `error: ${err}`, cid: null };
+    return { message: `error: ${err}`, cid: null, metadata: null };
   }
 
   // upload metadata object to IPFS
@@ -72,12 +81,17 @@ export const uploadMetadataToIPFS = async ({
       return {
         message: "metadata successfully uploaded",
         cid: upload.data.cid,
+        metadata,
       };
     } else {
-      return { message: "failed to upload metadata json", cid: null };
+      return {
+        message: "failed to upload metadata json",
+        cid: null,
+        metadata: null,
+      };
     }
   } catch (err: any) {
-    return { message: `error: ${err}`, cid: null };
+    return { message: `error: ${err}`, cid: null, metadata: null };
   }
 };
 
