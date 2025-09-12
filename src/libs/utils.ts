@@ -4,8 +4,16 @@ import { pinata } from "./pinata";
 export interface MetadataObject {
   name: string;
   symbol: string;
-  image: string;
   description: string;
+  image: string;
+  properties: {
+    files: [
+      {
+        uri: string;
+        type: string;
+      }
+    ];
+  };
 }
 
 export interface MetadataUploadResponse {
@@ -39,7 +47,12 @@ export const uploadMetadataToIPFS = async ({
   try {
     const upload = await pinata.upload.public.file(imageFile).url(res.data.url);
     if (upload.cid) {
-      metadata.image = `https://ipfs.io/ipfs/${upload.cid}`;
+      const imageUri = `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${
+        upload.cid
+      }`;
+      metadata.image = imageUri;
+      metadata.properties.files[0].uri = imageUri;
+      metadata.properties.files[0].type = imageFile.type;
       // console.log(metadata.image);
     } else {
       return { message: "failed to upload image file", cid: null };

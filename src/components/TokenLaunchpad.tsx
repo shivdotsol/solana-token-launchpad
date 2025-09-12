@@ -1,26 +1,22 @@
 import {
   createAssociatedTokenAccountInstruction,
   createInitializeMetadataPointerInstruction,
-  createInitializeMint2Instruction,
   createInitializeMintInstruction,
   createMintToInstruction,
   ExtensionType,
   getAssociatedTokenAddressSync,
-  getMinimumBalanceForRentExemptMint,
   getMintLen,
   LENGTH_SIZE,
-  MINT_SIZE,
   TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
   TYPE_SIZE,
 } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 import { Upload } from "lucide-react";
 import { useState } from "react";
-import axios from "axios";
 import { uploadMetadataToIPFS, type MetadataObject } from "../libs/utils";
 import { createInitializeInstruction, pack } from "@solana/spl-token-metadata";
+import { ClipLoader } from "react-spinners";
 
 function TokenLaunchpad() {
   const { connection } = useConnection();
@@ -51,12 +47,25 @@ function TokenLaunchpad() {
       throw new Error("no image found");
     }
 
+    alert("Your wallet will prompt you for 3 transactions.");
+    setStatus("Initiating...");
+
     const tokenMetadata: MetadataObject = {
       name: tokenName,
       symbol: tokenSymbol,
-      image: "", // this will be set inside the uploadMetadataToIPFS() function
       description: tokenDescription,
+      image: "", // this will be set inside the uploadMetadataToIPFS() function
+      properties: {
+        files: [
+          {
+            uri: "", // this too
+            type: "", // this too
+          },
+        ],
+      },
     };
+
+    setStatus("Uploading metadata to IPFS...");
 
     const uploadRes = await uploadMetadataToIPFS({
       publicKey: wallet.publicKey!.toString(),
@@ -67,9 +76,14 @@ function TokenLaunchpad() {
       setStatus(uploadRes.message);
       return;
     }
-    const metadataUri = `https://ipfs.io/ipfs/${uploadRes.cid}`;
+    const metadataUri = `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${
+      uploadRes.cid
+    }`;
+    console.log(metadataUri);
 
     //////////////////////////////////////////////////////////////////
+
+    setStatus("Generating token...");
 
     const mintKeypair = Keypair.generate();
     const metadata = {
@@ -96,7 +110,7 @@ function TokenLaunchpad() {
       createInitializeMetadataPointerInstruction(
         mintKeypair.publicKey,
         wallet.publicKey,
-        wallet.publicKey,
+        mintKeypair.publicKey,
         TOKEN_2022_PROGRAM_ID
       ),
       createInitializeMintInstruction(
@@ -129,6 +143,8 @@ function TokenLaunchpad() {
 
     // minting to user's ATA
 
+    setStatus("Minting the token to ATA...");
+
     const associatedTokenAddress = getAssociatedTokenAddressSync(
       mintKeypair.publicKey,
       wallet.publicKey,
@@ -158,11 +174,11 @@ function TokenLaunchpad() {
         TOKEN_2022_PROGRAM_ID
       )
     );
-
+    setStatus("Almost done.");
     await wallet.sendTransaction(transaction3, connection);
   };
   return (
-    <div className="relative w-[90vw] md:w-[50vw] lg:w-[30vw] px-10 pt-7 pb-10 flex flex-col rounded-xl border border-zinc-700 bg-zinc-950">
+    <div className="relative w-screen lg:w-[60vw] px-7 pb-7 pt-5 lg:px-10 lg:pt-7 lg:pb-10 flex flex-col rounded-xl border border-zinc-700 bg-zinc-950">
       {!wallet.publicKey && (
         <div className="absolute inset-[1%] h-[98%] w-[98%] backdrop-blur-sm rounded-2xl flex items-center justify-center font-extrabold text-2xl">
           <div className="flex px-10 py-5 border rounded-2xl border-red-700 backdrop-blur-xl bg-red-500/15">
@@ -172,99 +188,115 @@ function TokenLaunchpad() {
         </div>
       )}
       {status && (
-        <div className="px-5 py-2 bg-zinc-700 rounded-lg font-bold">
-          {status}
-        </div>
-      )}
-      <div className="text-2xl font-bold mb-8">Token details</div>
-      <form className="flex flex-col gap-y-3" onSubmit={handleCreateToken}>
-        <label htmlFor="name">Token name</label>
-        <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="text"
-          id="name"
-          placeholder="name of your token"
-          value={tokenName}
-          onChange={(e) => setTokenName(e.target.value)}
-          required
-        />
-
-        <label htmlFor="symbol">Token symbol</label>
-        <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="text"
-          id="symbol"
-          placeholder="symbol of your token"
-          value={tokenSymbol}
-          onChange={(e) => setTokenSymbol(e.target.value)}
-          required
-        />
-
-        <label htmlFor="description">Token description</label>
-        <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="text"
-          id="description"
-          placeholder="Describe your token briefly (max 150 characters)"
-          value={tokenDescription}
-          onChange={(e) => setTokenDescription(e.target.value)}
-          maxLength={150}
-          required
-        />
-
-        <label htmlFor="initialSupply">Initial supply</label>
-        <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="number"
-          id="initialSupply"
-          placeholder="100"
-          value={tokenSupply}
-          onChange={(e) => setTokenSupply(Number(e.target.value))}
-          required
-          min={1}
-        />
-
-        <label htmlFor="decimals">Decimals</label>
-        <input
-          className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
-          type="number"
-          id="decimals"
-          placeholder="0-9 (9 common, 6 stable coins, 0 NFTs)"
-          value={tokenDecimals}
-          onChange={(e) => setTokenDecimals(Number(e.target.value))}
-          required
-          min={0}
-          max={9}
-        />
-
-        <label>Token image</label>
-        <div className="relative">
-          <label
-            htmlFor="imageFile"
-            className="py-5 cursor-pointer rounded-lg flex items-center justify-center bg-zinc-800 hover:bg-zinc-800/80 transition-all duration-150"
-          >
-            <span className="font-bold">
-              {tokenImageFile?.name ? "Selected image : " : <Upload />}
-            </span>
-            <span className="ml-2 px-3 py-1 rounded-md bg-zinc-700">
-              {tokenImageFile?.name || "Upload image"}
-            </span>
-          </label>
-          <input
-            className="absolute inset-1/3 opacity-0"
-            type="file"
-            id="imageFile"
-            onChange={handleImageFileChange}
-            required
+        <div className="flex justify-between text-base md:text-lg px-5 py-3 bg-green-300/15 font-extrabold mb-3 rounded-lg border border-neutral-500 text-green-300">
+          <div>{`Status: ${status}`}</div>
+          <ClipLoader
+            color="#86efac"
+            size={30}
+            cssOverride={{
+              borderWidth: "3px",
+            }}
           />
         </div>
-        <button
-          type="submit"
-          className="bg-zinc-300/95 mt-5 hover:bg-zinc-400 cursor-pointer active:scale-[98%] 
+      )}
+      <div className="text-2xl font-bold hidden md:block lg:mb-8">
+        Token details
+      </div>
+      <form
+        className="flex flex-col lg:flex-row lg:justify-between gap-3"
+        onSubmit={handleCreateToken}
+      >
+        <div className="lg:w-[47%] flex flex-col gap-y-3">
+          <label htmlFor="name">Token name</label>
+          <input
+            className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
+            type="text"
+            id="name"
+            placeholder="name of your token"
+            value={tokenName}
+            onChange={(e) => setTokenName(e.target.value)}
+            required
+          />
+
+          <label htmlFor="symbol">Token symbol</label>
+          <input
+            className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
+            type="text"
+            id="symbol"
+            placeholder="symbol of your token"
+            value={tokenSymbol}
+            onChange={(e) => setTokenSymbol(e.target.value)}
+            required
+          />
+
+          <label htmlFor="description">Token description</label>
+          <input
+            className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
+            type="text"
+            id="description"
+            placeholder="Describe your token briefly (max 150 characters)"
+            value={tokenDescription}
+            onChange={(e) => setTokenDescription(e.target.value)}
+            maxLength={150}
+            required
+          />
+
+          <label htmlFor="initialSupply">Initial supply</label>
+          <input
+            className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
+            type="number"
+            id="initialSupply"
+            placeholder="100"
+            value={tokenSupply}
+            onChange={(e) => setTokenSupply(Number(e.target.value))}
+            required
+            min={1}
+          />
+        </div>
+
+        <div className="lg:w-[47%] flex flex-col gap-y-3">
+          <label htmlFor="decimals">Decimals</label>
+          <input
+            className="mb-5 px-4 py-2 bg-zinc-800 rounded-lg"
+            type="number"
+            id="decimals"
+            placeholder="0-9 (9 common, 6 stable coins, 0 NFTs)"
+            value={tokenDecimals}
+            onChange={(e) => setTokenDecimals(Number(e.target.value))}
+            required
+            min={0}
+            max={9}
+          />
+
+          <label>Token image</label>
+          <div className="relative">
+            <label
+              htmlFor="imageFile"
+              className="py-5 lg:py-16 cursor-pointer rounded-lg flex items-center justify-center bg-zinc-800 hover:bg-zinc-800/80 transition-all duration-150"
+            >
+              <span className="font-bold">
+                {tokenImageFile?.name ? "Selected image : " : <Upload />}
+              </span>
+              <span className="ml-2 px-3 py-1 rounded-md bg-zinc-700">
+                {tokenImageFile?.name || "Upload image"}
+              </span>
+            </label>
+            <input
+              className="absolute inset-1/3 opacity-0"
+              type="file"
+              id="imageFile"
+              onChange={handleImageFileChange}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            className="bg-zinc-300/95 mt-5 hover:bg-zinc-400 cursor-pointer active:scale-[98%] 
       transition-all duration-150 py-2 text-zinc-950 font-bold text-lg rounded-lg "
-        >
-          Create token
-        </button>
+          >
+            Create token
+          </button>
+        </div>
       </form>
     </div>
   );

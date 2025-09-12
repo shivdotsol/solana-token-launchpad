@@ -11,18 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// add rate limiting middleware
-
 app.post("/signedUrl", async (req, res) => {
-  const { signature, publicKey, fileType } = req.body;
-  // if (!signature || !publicKey || fileType) {
-  //   res.status(400).json({ message: "missing inputs" });
-  // }
-
-  // const isSignValid = await verifySignature(signature, publicKey);
-  // if (!isSignValid) {
-  //   res.status(401).json({ message: "invalid signature" });
-  // }
+  const { publicKey, fileType } = req.body;
 
   try {
     const url = await pinata.upload.public.createSignedURL({

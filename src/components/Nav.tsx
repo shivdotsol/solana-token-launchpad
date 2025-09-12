@@ -16,8 +16,8 @@ function Nav({ children }: { children: React.ReactNode }) {
     return () => clearInterval(shadowBlinker);
   }, [wallet.publicKey]);
   return (
-    <div className="flex justify-between fixed w-screen top-0 px-7 py-5 text-xl lg:text-3xl font-extrabold text-zinc-200">
-      <p className="py-3 px-5">Solana Token Launchpad</p>
+    <div className="flex justify-between fixed w-screen top-0 p-2 lg:px-7 lg:py-5 text-xl lg:text-3xl font-extrabold text-zinc-200">
+      <p className="px-2 lg:py-3 lg:px-5">Solana Token Launchpad</p>
       <div
         style={{
           boxShadow: `0px 0px ${shadowRadius}px 0px #b91c1c`,
